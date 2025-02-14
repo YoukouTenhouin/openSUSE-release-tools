@@ -7,15 +7,8 @@ import os
 class Action(vcs.base.VCSBase):
     """Stub VCS interface implementation for running as an action"""
 
-    @staticmethod
-    def _read_context():
-        env = os.environ["GITHUB_CONTEXT"]
-        return json.loads(env)
-
     def __init__(self, logger):
         self.logger = logger
-        self.context = Action._read_context()
-        self.logger.debug(f'Github Context: {self.context}')
 
     @property
     def name(self) -> str:
@@ -35,5 +28,4 @@ class Action(vcs.base.VCSBase):
         src = os.environ["GITHUB_WORKSPACE"]
         dst = f'{pathname}/{target_package}'
         self.logger.debug(f'checkout: {src} -> {dst}')
-        self.logger.debug('Contenxt: ', self.context)
         shutil.copytree(src, dst)

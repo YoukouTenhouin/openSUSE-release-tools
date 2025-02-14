@@ -28,6 +28,13 @@ jobs:
 
       - name: Run check_source
         id: check_source
+        env:
+          PR_SRC_FULL_NAME: ${{ github.event.pull_request.head.repo.full_name }}
+          PR_SRC_REV: ${{ github.sha }}
+          PR_DST_FULL_NAME: ${{ github.event.pull_request.base.repo.full_name }}
+          PR_CREATOR: ${{ github.event.pull_request.user.login }}
+          PR_CREATED_AT: ${{ github.event.pull_request.created_at }}
+          PR_DESCRIPTION: ${{ github.event.pull_request.body }}
         run: |
           # set OBS API address to http://localhost:3000 just in case
           python check_source.py --scm-type=Action --platform=Action --debug -A http://localhost:3000
