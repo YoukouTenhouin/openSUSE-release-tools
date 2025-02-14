@@ -36,6 +36,16 @@ jobs:
           python -m pip install --upgrade pip
           pip install -r release_tools/requirements.txt
 
+      - name: Checkout obs-build
+        uses: actions/checkout@v4
+        with:
+          repository: openSUSE/obs-build
+          path: obs_build
+
+      - name: Install obs-build
+        run: sudo make install
+        working-directory: obs_build
+
       - name: Checkout source validator
         uses: actions/checkout@v4
         with:
