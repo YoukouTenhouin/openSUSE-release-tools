@@ -36,6 +36,16 @@ jobs:
         run: sudo make install
         working-directory: source_validator
 
+      - name: Checkout download_files
+        uses: actions/checkout@v4
+        with:
+          repository: openSUSE/obs-service-download_files
+          path: download_files
+
+      - name: Install download_files
+        run: sudo make install
+        working-directory: download_files
+
       - name: Run check_source
         id: check_source
         env:
