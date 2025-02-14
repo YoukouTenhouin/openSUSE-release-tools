@@ -35,4 +35,5 @@ class Action(vcs.base.VCSBase):
         src = os.environ["GITHUB_WORKSPACE"]
         dst = f'{pathname}/{target_package}'
         self.logger.debug(f'checkout: {src} -> {dst}')
+        self.logger.debug('Contenxt: ', self.context)
         shutil.copytree(src, dst)

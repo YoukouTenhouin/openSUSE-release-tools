@@ -1,0 +1,42 @@
+name: Run Check Source Action
+
+on:
+  workflow_call:
+
+jobs:
+  review:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout release tools
+        uses: actions/checkout@v4
+        with:
+          repository: YoukouTenhouin/openSUSE-release-tools
+          ref: vcs-refactor
+          path: release_tools
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          repository: ${{ github.repository }}
+          ref: ${{ github.sha }}
+          python-version: '3.x'
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r release_tools/requirements.txt
+
+      - name: Run check_source
+        id: check_source
+        run: |
+          # set OBS API address to http://localhost:3000 just in case
+          python check_source.py --scm-type=Action --platform=Action --debug -A http://localhost:3000
+        working-directory: release_tools
+
+      - name: Check results
+        if: steps.check_source.outcome != 'success'
+        uses: actions/github-script@v6
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            core.setFailed('check_source rejected review. Check the logs for details.')
