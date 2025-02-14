@@ -36,8 +36,7 @@ jobs:
           PR_CREATED_AT: ${{ github.event.pull_request.created_at }}
           PR_DESCRIPTION: ${{ github.event.pull_request.body }}
         run: |
-          # set OBS API address to http://localhost:3000 just in case
-          python check_source.py --scm-type=Action --platform=Action --debug -A http://localhost:3000
+          python check_source.py --scm-type=Action --platform=Action --debug -A http://localhost:3000 action # set OBS API address to http://localhost:3000 just in case
         working-directory: release_tools
 
       - name: Check results
