@@ -35,7 +35,7 @@ class Action(vcs.base.VCSBase):
         elif target_project == base_project and target_package == base_package:
             src = f"{workspace}/base"
         else:
-            raise RuntimeError(f"Invalid checkout target: ${target_project}/${target_package}")
+            raise RuntimeError(f"Invalid checkout target: {target_project}/{target_package}")
 
         dst = f'{pathname}/{target_package}'
         self.logger.debug(f'checkout: {target_project}/{target_package} {src} -> {dst}')
