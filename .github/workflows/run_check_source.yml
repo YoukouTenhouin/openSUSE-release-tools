@@ -1,0 +1,89 @@
+name: Run Check Source Action
+
+on:
+  workflow_call:
+
+jobs:
+  review:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout base
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.base_ref }}
+          path: base
+
+      - name: Checkout head
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.head_ref }}
+          path: head
+
+      - name: Checkout release tools
+        uses: actions/checkout@v4
+        with:
+          repository: yudaike/openSUSE-release-tools
+          ref: vcs-refactor
+          path: release_tools
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.x'
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r release_tools/requirements.txt
+
+      - name: Checkout obs-build
+        uses: actions/checkout@v4
+        with:
+          repository: openSUSE/obs-build
+          path: obs_build
+
+      - name: Install obs-build
+        run: sudo make install
+        working-directory: obs_build
+
+      - name: Checkout source validator
+        uses: actions/checkout@v4
+        with:
+          repository: openSUSE/obs-service-source_validator 
+          path: source_validator
+
+      - name: Install source validator
+        run: sudo make install
+        working-directory: source_validator
+
+      - name: Checkout download_files
+        uses: actions/checkout@v4
+        with:
+          repository: openSUSE/obs-service-download_files
+          path: download_files
+
+      - name: Install download_files
+        run: sudo make install
+        working-directory: download_files
+
+      - name: Run check_source
+        id: check_source
+        env:
+          PR_SRC_FULL_NAME: ${{ github.event.pull_request.head.repo.full_name }}
+          PR_SRC_REV: ${{ github.event.pull_request.head.sha }}
+          PR_DST_FULL_NAME: ${{ github.event.pull_request.base.repo.full_name }}
+          PR_DST_REV: ${{ github.event.pull_request.base.sha }}
+          PR_CREATOR: ${{ github.event.pull_request.user.login }}
+          PR_CREATED_AT: ${{ github.event.pull_request.created_at }}
+          PR_DESCRIPTION: ${{ github.event.pull_request.body }}
+        run: |
+          python check_source.py --scm-type=Action --platform=Action --debug -A http://localhost:3000 action # set OBS API address to http://localhost:3000 just in case
+        working-directory: release_tools
+
+      - name: Check results
+        if: steps.check_source.outcome != 'success'
+        uses: actions/github-script@v6
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            core.setFailed('check_source rejected review. Check the logs for details.')
