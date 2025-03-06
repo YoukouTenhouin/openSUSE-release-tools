@@ -27,9 +27,8 @@ jobs:
           path: release_tools
 
       - name: Set up Python
-        uses: https://github.com/actions/setup-python@v4
-        with:
-          python-version: '3.x'
+        run: |
+          zypper in -y python
 
       - name: Install dependencies
         run: |
