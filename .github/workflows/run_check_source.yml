@@ -5,7 +5,7 @@ on:
 
 jobs:
   review:
-    runs-on: ubuntu-latest
+    runs-on: tumbleweed
     steps:
       - name: Checkout base
         uses: actions/checkout@v4
@@ -22,7 +22,7 @@ jobs:
       - name: Checkout release tools
         uses: actions/checkout@v4
         with:
-          repository: YoukouTenhouin/openSUSE-release-tools
+          repository: yudaike/openSUSE-release-tools
           ref: vcs-refactor
           path: release_tools
 
