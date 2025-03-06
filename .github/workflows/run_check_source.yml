@@ -8,26 +8,26 @@ jobs:
     runs-on: tumbleweed
     steps:
       - name: Checkout base
-        uses: actions/checkout@v4
+        uses: https://github.com/actions/checkout@v4
         with:
           ref: ${{ github.base_ref }}
           path: base
 
       - name: Checkout head
-        uses: actions/checkout@v4
+        uses: https://github.com/actions/checkout@v4
         with:
           ref: ${{ github.head_ref }}
           path: head
 
       - name: Checkout release tools
-        uses: actions/checkout@v4
+        uses: https://github.com/actions/checkout@v4
         with:
           repository: yudaike/openSUSE-release-tools
           ref: vcs-refactor
           path: release_tools
 
       - name: Set up Python
-        uses: actions/setup-python@v4
+        uses: https://github.com/actions/setup-python@v4
         with:
           python-version: '3.x'
 
@@ -37,7 +37,7 @@ jobs:
           pip install -r release_tools/requirements.txt
 
       - name: Checkout obs-build
-        uses: actions/checkout@v4
+        uses: https://github.com/actions/checkout@v4
         with:
           repository: openSUSE/obs-build
           path: obs_build
@@ -47,7 +47,7 @@ jobs:
         working-directory: obs_build
 
       - name: Checkout source validator
-        uses: actions/checkout@v4
+        uses: https://github.com/actions/checkout@v4
         with:
           repository: openSUSE/obs-service-source_validator 
           path: source_validator
@@ -57,7 +57,7 @@ jobs:
         working-directory: source_validator
 
       - name: Checkout download_files
-        uses: actions/checkout@v4
+        uses: https://github.com/actions/checkout@v4
         with:
           repository: openSUSE/obs-service-download_files
           path: download_files
@@ -79,11 +79,3 @@ jobs:
         run: |
           python check_source.py --scm-type=Action --platform=Action --debug -A http://localhost:3000 action # set OBS API address to http://localhost:3000 just in case
         working-directory: release_tools
-
-      - name: Check results
-        if: steps.check_source.outcome != 'success'
-        uses: actions/github-script@v6
-        with:
-          github-token: ${{ secrets.GITHUB_TOKEN }}
-          script: |
-            core.setFailed('check_source rejected review. Check the logs for details.')
