@@ -1,11 +1,17 @@
 import scm.base
 
+import git
+import os
+import shutil
+
 
 class Git(scm.base.SCMBase):
     """SCM interface implementation for Git"""
 
-    def __init__(self):
+    def __init__(self, logger, base_url):
         # XXX stub
+        self.logger = logger
+        self.base_url = base_url
         pass
 
     @property
@@ -23,5 +29,14 @@ class Git(scm.base.SCMBase):
             pathname,
             **kwargs
     ):
-        # XXX stub
-        raise NotImplementedError
+        dstpath = os.path.join(pathname, target_package)
+        url = f"{self.base_url}/{target_project}/{target_package}.git"
+        repo = git.Repo.clone_from(url, dstpath)
+
+        revision = kwargs.get('revision')
+        if revision is not None:
+            repo.remotes.origin.fetch([revision])
+            repo.git.checkout(revision)
+
+        for i in ['.github', '.gitea', '.git']:
+            shutil.rmtree(os.path.join(dstpath, i), ignore_errors=True)
