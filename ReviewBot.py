@@ -19,7 +19,6 @@ from osclib.core import request_action_key
 from osclib.core import request_age
 from osclib.memoize import memoize
 from osclib.memoize import memoize_session_reset
-from osclib.stagingapi import StagingAPI
 import scm
 import plat
 import signal
@@ -105,11 +104,13 @@ class ReviewBot(object):
             user=None,
             group=None,
             scm_type="OSC",
-            platform_type="OBS"
+            platform_type="OBS",
+            gitea_url="https://src.opensuse.org",
+            git_base_url="https://src.opensuse.org"
     ):
         self._apiurl = apiurl
 
-        self.ibs = apiurl.startswith('https://api.suse.de')
+        self.ibs = apiurl and apiurl.startswith('https://api.suse.de')
         self.dryrun = dryrun
         self.logger = logger
         self.review_user = user
@@ -128,10 +129,14 @@ class ReviewBot(object):
         self.request_age_min_default = 0
         self.request_age_min_key = f'{self.bot_name.lower()}-request-age-min'
 
+        self.gitea_url = gitea_url
+        self.git_base_url = git_base_url
         self.scm_type = scm_type
         self.platform_type = platform_type
 
         self.lookup = PackageLookup(self.scm)
+
+        self.staging_apis = {}
 
         self.load_config()
 
@@ -155,7 +160,7 @@ class ReviewBot(object):
         if scm_type == "OSC":
             self.scm = scm.OSC(self.apiurl)
         elif scm_type == "GIT":
-            self.scm = scm.Git()
+            self.scm = scm.Git(self.logger, self.git_base_url)
         elif scm_type == "ACTION":
             self.scm = scm.Action(self.logger)
         else:
@@ -174,6 +179,8 @@ class ReviewBot(object):
             self.platform = plat.OBS(self._apiurl)
         elif platform_type == "ACTION":
             self.platform = plat.Action(self.logger)
+        elif platform_type == "GITEA":
+            self.platform = plat.Gitea(self.logger, self.gitea_url)
         else:
             raise RuntimeError(f'invalid Platform type: {platform_type}')
         self._platform_type = platform_type
@@ -207,7 +214,7 @@ class ReviewBot(object):
 
         if project not in self.staging_apis:
             self.platform.get_project_config(project)
-            self.staging_apis[project] = StagingAPI(self.apiurl, project)
+            self.staging_apis[project] = self.platform.get_staging_api(project)
 
         return self.staging_apis[project]
 
@@ -338,7 +345,7 @@ class ReviewBot(object):
         if not who_allowed:
             who_allowed = self.request_override_check_users(action.tgt_project)
 
-        comments = self.platform.comment_api.get_comments(request_id=request.reqid)
+        comments = self.platform.comment_api.get_comments(request=request)
         if include_description:
             request_comment = self.platform.comment_api.request_as_comment_dict(request)
             comments[request_comment['id']] = request_comment
@@ -346,7 +353,7 @@ class ReviewBot(object):
         yield from self.platform.comment_api.command_find(comments, self.review_user, command, who_allowed)
 
     def _set_review(self, req, state):
-        doit = self.can_accept_review(req.reqid)
+        doit = self.can_accept_review(req)
         if doit is None:
             self.logger.info(f"can't change state, {req.reqid} does not have the reviewer")
 
@@ -373,10 +380,10 @@ class ReviewBot(object):
             else:
                 self.logger.debug(f"setting {req.reqid} to {state}")
                 try:
-                    osc.core.change_review_state(apiurl=self.apiurl,
-                                                 reqid=req.reqid, newstate=newstate,
-                                                 by_group=self.review_group,
-                                                 by_user=self.review_user, message=msg)
+                    self.platform.change_review_state(req=req, newstate=newstate,
+                                                      message=msg,
+                                                      by_group=self.review_group,
+                                                      by_user=self.review_user)
                 except HTTPError as e:
                     if e.code != 403:
                         raise e
@@ -692,43 +699,12 @@ class ReviewBot(object):
 
         return (None, None)
 
-    def _has_open_review_by(self, root, by_what, reviewer):
-        states = set([review.get('state') for review in root.findall('review') if review.get(by_what) == reviewer])
-        if not states:
-            return None
-        elif 'new' in states:
-            return True
-        return False
-
-    def can_accept_review(self, request_id):
+    def can_accept_review(self, req):
         """return True if there is a new review for the specified reviewer"""
-        url = osc.core.makeurl(self.apiurl, ('request', str(request_id)))
-        try:
-            root = ET.parse(osc.core.http_GET(url)).getroot()
-            if self.review_user and self._has_open_review_by(root, 'by_user', self.review_user):
-                return True
-            if self.review_group and self._has_open_review_by(root, 'by_group', self.review_group):
-                return True
-        except HTTPError as e:
-            print(f'ERROR in URL {url} [{e}]')
-        return False
+        return self.platform.can_accept_review(req, review_user=self.review_user, review_group=self.review_group)
 
     def set_request_ids_search_review(self):
-        review = None
-        if self.review_user:
-            review = f"@by_user='{self.review_user}' and @state='new'"
-        if self.review_group:
-            review = osc.core.xpath_join(review, f"@by_group='{self.review_group}' and @state='new'")
-        url = osc.core.makeurl(self.apiurl, ('search', 'request'), {
-                               'match': f"state/@name='review' and review[{review}]", 'withfullhistory': 1})
-        root = ET.parse(osc.core.http_GET(url)).getroot()
-
-        self.requests = []
-
-        for request in root.findall('request'):
-            req = osc.core.Request()
-            req.read(request)
-            self.requests.append(req)
+        self.requests = self.platform.search_review(review_user=self.review_user, review_group=self.review_group)
 
     # also used by openqabot
     def ids_project(self, project, typename):
@@ -800,7 +776,7 @@ class ReviewBot(object):
         else:
             if request is None:
                 request = self.request
-            kwargs = {'request_id': request.reqid}
+            kwargs = {'request': request}
         debug_key = '/'.join(kwargs.values())
 
         if message is None:
@@ -955,6 +931,12 @@ class CommandLineInterface(cmdln.Cmdln):
         parser.add_option('-c', '--config', dest='config', metavar='FILE', help='read config file FILE')
         parser.add_option('--scm-type', default='OSC', dest='scm_type', metavar='SCM', help='set scm type')
         parser.add_option('--platform', default='OBS', dest='platform_type', metavar='Platform', help='set platform type')
+        parser.add_option('--gitea-url', '-G', metavar="URL",
+                          default="https://src.opensuse.org",
+                          help="Gitea API url (only relevent when platform type = gitea)")
+        parser.add_option('--git-base-url', metavar="URL",
+                          default="https://src.opensuse.org",
+                          help="Base URL for git checkouts (only relevent when platform type = git")
 
         return parser
 
@@ -1011,7 +993,9 @@ class CommandLineInterface(cmdln.Cmdln):
                           group=group,
                           logger=self.logger,
                           scm_type=self.options.scm_type,
-                          platform_type=self.options.platform_type)
+                          platform_type=self.options.platform_type,
+                          gitea_url=self.options.gitea_url,
+                          git_base_url=self.options.git_base_url)
 
     def do_action(self, subcmd, opts, *args):
         """${cmd_name}: run as an action
