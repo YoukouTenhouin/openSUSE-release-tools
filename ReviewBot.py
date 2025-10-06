@@ -345,7 +345,7 @@ class ReviewBot(object):
         if not who_allowed:
             who_allowed = self.request_override_check_users(action.tgt_project)
 
-        comments = self.platform.comment_api.get_comments(request=request)
+        comments = self.platform.comment_api.get_comments(request_id=request.reqid)
         if include_description:
             request_comment = self.platform.comment_api.request_as_comment_dict(request)
             comments[request_comment['id']] = request_comment
@@ -776,7 +776,7 @@ class ReviewBot(object):
         else:
             if request is None:
                 request = self.request
-            kwargs = {'request': request}
+            kwargs = {'request_id': request.reqid}
         debug_key = '/'.join(kwargs.values())
 
         if message is None:
