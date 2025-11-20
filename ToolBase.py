@@ -7,6 +7,8 @@ import logging
 import signal
 import sys
 import time
+import scm
+import plat
 
 from urllib.error import HTTPError, URLError
 
@@ -36,6 +38,10 @@ class ToolBase(object):
         self.debug = osc.conf.config['debug']
         self.caching = False
         self.dryrun = False
+        self.scm_type = "OSC"
+        self.scm = None
+        self.platform_type = "OBS"
+        self.platform = None
 
     @memoize(add_invalidate=True)
     def _cached_GET(self, url):
@@ -140,6 +146,14 @@ class CommandLineInterface(cmdln.Cmdln):
                           help='debug HTTP traffic (filters no headers)')
         parser.add_option('--cache-requests', action='store_true', default=False,
                           help='cache GET requests. Not recommended for daily use.')
+        parser.add_option('--scm-type', default='OSC', dest='scm_type', metavar='SCM', help='set scm type')
+        parser.add_option('--platform', default='OBS', dest='platform_type', metavar='Platform', help='set platform type')
+        parser.add_option('--gitea-url', '-G', metavar="URL",
+                          default="https://src.opensuse.org",
+                          help="Gitea API url (only relevent when platform type = gitea)")
+        parser.add_option('--git-base-url', metavar="URL",
+                          default="https://src.opensuse.org",
+                          help="Base URL for git checkouts (only relevent when platform type = git")
 
         return parser
 
@@ -160,6 +174,29 @@ class CommandLineInterface(cmdln.Cmdln):
         self.tool = self.setup_tool()
         self.tool.dryrun = self.options.dry
         self.tool.caching = self.options.cache_requests
+
+        scm_type = self.options.scm_type.upper()
+        self.tool.scm_type = scm_type
+        if scm_type == "OSC":
+            self.tool.scm = scm.OSC(self.options.apiurl)
+        elif scm_type == "GIT":
+            self.tool.scm = scm.Git(logger, self.options.git_base_url)
+        elif scm_type == "ACTION":
+            self.tool.scm = scm.Action(logger)
+        else:
+            raise RuntimeError(f'invalid SCM type: {scm_type}')
+
+        platform_type = self.options.platform_type.upper()
+        self.tool.platform_type = platform_type
+        if platform_type == 'OBS':
+            self.tool.platform = plat.OBS(self.options.apiurl)
+        elif platform_type == "ACTION":
+            self.tool.platform = plat.Action(logger)
+        elif platform_type == "GITEA":
+            self.tool.platform = plat.Gitea(logger, self.options.gitea_url)
+        else:
+            raise RuntimeError(f'invalid Platform type: {platform_type}')
+        self._platform_type = platform_type
 
     def setup_tool(self, toolclass=ToolBase):
         """ reimplement this """
