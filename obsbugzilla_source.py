@@ -128,6 +128,8 @@ class SourceOBS(ReviewBot.ReviewBot):
                 actions.append(a)
             print(json.dumps({
                 "request": req.reqid,
+                "title": req.title,
+                "body": req.description,
                 "actions": actions
             }))
 
