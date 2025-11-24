@@ -161,8 +161,6 @@ class ReviewBot(object):
             self.scm = scm.OSC(self.apiurl)
         elif scm_type == "GIT":
             self.scm = scm.Git(self.logger, self.git_base_url)
-        elif scm_type == "ACTION":
-            self.scm = scm.Action(self.logger)
         else:
             raise RuntimeError(f'invalid SCM type: {scm_type}')
 
@@ -177,8 +175,6 @@ class ReviewBot(object):
         platform_type = platform_type.upper()
         if platform_type == 'OBS':
             self.platform = plat.OBS(self._apiurl)
-        elif platform_type == "ACTION":
-            self.platform = plat.Action(self.logger)
         elif platform_type == "GITEA":
             self.platform = plat.Gitea(self.logger, self.gitea_url)
         else:
