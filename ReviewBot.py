@@ -287,6 +287,26 @@ class ReviewBot(object):
 
         return return_value
 
+    def check_as_action(self):
+        self.staging_apis = {}
+
+        # give implementations a chance to do something before single requests
+        self.prepare_review()
+
+        self.request = plat.Action.get_stub_request()
+        try:
+            ret = self.check_one_request(self.request)
+        except Exception:
+            import traceback
+            traceback.print_exc()
+            return 255
+
+        state = "accepted" if ret else "declined"
+        msg = self.review_messages[state] if state in self.review_messages else state
+        print(msg)
+
+        return 0 if ret else 1
+
     @memoize(session=True)
     def request_override_check_users(self, project: str) -> List[str]:
         """Determine users allowed to override review in a comment command."""
@@ -983,6 +1003,20 @@ class CommandLineInterface(cmdln.Cmdln):
                           platform_type=self.options.platform_type,
                           gitea_url=self.options.gitea_url,
                           git_base_url=self.options.git_base_url)
+
+    def do_action(self, subcmd, opts, *args):
+        """${cmd_name}: run as an action
+
+        ${cmd_usage}
+        ${cmd_option_list}
+        """
+        if self.options.scm_type.upper() != "ACTION":
+            raise RuntimeError('action command only works with Action as SCM')
+
+        if self.options.platform_type.upper() != "ACTION":
+            raise RuntimeError('action command only works with Action as Platform')
+
+        return self.checker.check_as_action()
 
     def do_id(self, subcmd, opts, *args):
         """${cmd_name}: check the specified request ids
