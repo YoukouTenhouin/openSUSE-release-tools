@@ -118,13 +118,13 @@ class SourceOBS(ReviewBot.ReviewBot):
             for action in req.actions:
                 a = {}
                 if hasattr(action, 'src_package'):
-                    a["sourcepackage"] = action.src_package,
+                    a["sourcepackage"] = action.src_package
                 if hasattr(action, 'src_project'):
-                    a["sourceproject"] = action.src_project,
+                    a["sourceproject"] = action.src_project
                 if hasattr(action, 'tgt_package'):
-                    a["targetpackage"] = action.tgt_package,
+                    a["targetpackage"] = action.tgt_package
                 if hasattr(action, 'tgt_project'):
-                    a["targetproject"] = action.tgt_project,
+                    a["targetproject"] = action.tgt_project
                 actions.append(a)
             print(json.dumps({
                 "request": req.reqid,
