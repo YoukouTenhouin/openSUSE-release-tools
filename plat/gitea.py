@@ -293,9 +293,7 @@ class Gitea(plat.base.PlatformBase):
     def get_staging_api(self, project):
         return StagingAPI(project, self.api)
 
-    def search_review(self, **kwargs):
-        params: dict[str, str | int] = {'state': 'open', "type": "pulls", "review_requested": "true"}
-
+    def search(self, params):
         page = 1
         while True:
             params["page"] = page
@@ -306,6 +304,12 @@ class Gitea(plat.base.PlatformBase):
 
             for i in search_res:
                 yield self._request_from_issue(i)
+
+    def search_review(self, **kwargs):
+        params: dict[str, str | int] = {
+            'state': 'open', "type": "pulls", "review_requested": "true"
+        }
+        return self.search(params)
 
     def can_accept_review(self, req, **kwargs):
         # stub
