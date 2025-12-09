@@ -146,13 +146,14 @@ class StagingAPI:
 
 class RequestAction:
     """Stub action class"""
-    def __init__(self, type, src_project, src_package, src_rev, tgt_project, tgt_package):
+    def __init__(self, type, src_project, src_package, src_rev, tgt_project, tgt_package, tgt_rev):
         self.type = type
         self.src_project = src_project
         self.src_package = src_package
         self.src_rev = src_rev
         self.tgt_project = tgt_project
         self.tgt_package = tgt_package
+        self.tgt_rev = tgt_rev
 
 
 class Request:
@@ -208,7 +209,8 @@ class Request:
             src_package=json["head"]["repo"]["name"],
             src_rev=json["head"]["sha"],
             tgt_project=json["base"]["repo"]["owner"]["login"],
-            tgt_package=json["base"]["repo"]["name"])]
+            tgt_package=json["base"]["repo"]["name"],
+            tgt_rev=json["base"]["sha"])]
         if json.get("merged"):
             self.accept_at = json["merged_at"]
 

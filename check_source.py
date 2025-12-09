@@ -473,8 +473,12 @@ class CheckSource(ReviewBot.ReviewBot):
                     changes_updated = True
 
         if not changes_updated:
-            self.review_messages['declined'] = "No changelog. Please use 'osc vc' to update the changes file(s)."
-            return False
+            if self.platform_type == "GITEA" and self.request.actions[0].src_rev == self.request.actions[0].tgt_rev:
+                # empty PR
+                self.logger.info("Empty PR; skippng changes_updated check")
+            else:
+                self.review_messages['declined'] = "No changelog. Please use 'osc vc' to update the changes file(s)."
+                return False
 
         return True
 
