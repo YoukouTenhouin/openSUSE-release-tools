@@ -159,16 +159,19 @@ class RequestAction:
         self.type = type
         self._set_attr_from_json('src_project', json, 'head.repo.owner.login')
         self._set_attr_from_json('src_package', json, 'head.repo.name')
+        self._set_attr_from_json('src_branch', json, 'head.ref')
         self._set_attr_from_json('src_rev', json, 'head.sha')
         self._set_attr_from_json('tgt_project', json, 'base.repo.owner.login')
         self._set_attr_from_json('tgt_package', json, 'base.repo.name')
+        self._set_attr_from_json('tgt_branch', json, 'base.ref')
         self._set_attr_from_json('tgt_rev', json, 'base.sha')
 
 
 class Request:
     """Request structure implemented for Gitea"""
-    def __init__(self):
+    def __init__(self, api):
         self._init_attributes()
+        self.api = api
 
     @staticmethod
     def parse_request_id(reqid):
@@ -180,7 +183,6 @@ class Request:
         return f'{owner}:{repo}:{pr_id}'
 
     def _init_attributes(self):
-        self.reqid = None
         self.creator = ''
         self.created_at = ''
         self.title = ''
@@ -188,7 +190,7 @@ class Request:
         self.priority = None
         self.state = None
         self.accept_at = None
-        self.actions = []
+        self._actions = None
         self.statehistory = []
         self.reviews = []
         self._issues = None
@@ -198,8 +200,32 @@ class Request:
         self._repo = None
         self._pr_id = None
 
-    def read(self, json, owner, repo):
-        """Read in a request from JSON response"""
+    @property
+    def reqid(self):
+        if not self._owner or not self._repo or not self._pr_id:
+            return None
+        return Request.construct_request_id(self._owner, self._repo, self._pr_id)
+
+    @reqid.setter
+    def reqid(self, reqid):
+        if reqid is None:
+            self._owner = None
+            self._repo = None
+            self._pr_id = None
+            return
+
+        owner, repo, pr_id = Request.parse_request_id(reqid)
+        self._owner = owner
+        self._repo = repo
+        self._pr_id = pr_id
+
+    @property
+    def actions(self):
+        if not self._actions:
+            self._load()
+        return self._actions
+
+    def _read_json_common(self, json, owner, repo):
         self._init_attributes()
 
         self._owner = owner
@@ -214,11 +240,26 @@ class Request:
         self.description = json["body"]
         self.state = json["state"]
 
-        self.actions = [RequestAction(type="submit", json=json)]
+    def _load(self):
+        res = self.api.get(f'repos/{self._owner}/{self._repo}/pulls/{self._pr_id}').json()
+        self.read(res, self._owner, self._repo)
+
+    def read(self, json, owner, repo):
+        """Read in a request from Pull Request JSON"""
+        self._read_json_common(json, owner, repo)
+
+        self._actions = [RequestAction(type="submit", json=json)]
 
         if json.get("merged"):
             self.accept_at = json["merged_at"]
 
+    def read_issue(self, json, owner, repo):
+        """Read in a request from Issue JSON"""
+        self._read_json_common(json, owner, repo)
+
+        pr_info = json.get("pull_request")
+        if pr_info.get("merged"):
+            self.accept_at = json["merged_at"]
 
 class ProjectConfig:
     """Project Config implemented for Gitea"""
@@ -244,16 +285,11 @@ class Gitea(plat.base.PlatformBase):
         path = '/'.join(args)
         return self.api.get(path)
 
-    def _get_request(self, pr_id, owner, repo):
-        res = self.api.get(f'repos/{owner}/{repo}/pulls/{pr_id}').json()
-
-        ret = Request()
-        ret.read(res, owner=owner, repo=repo)
-        return ret
-
     def get_request(self, request_id, with_full_history=False):
-        owner, repo, pr_id = Request.parse_request_id(request_id)
-        return self._get_request(pr_id, owner, repo)
+        ret = Request(self.api)
+        ret.reqid = request_id
+        ret._load()
+        return ret
 
     def get_project_config(self, project):
         return ProjectConfig()
@@ -264,8 +300,10 @@ class Gitea(plat.base.PlatformBase):
     def _request_from_issue(self, issue_json):
         owner = issue_json["repository"]["owner"]
         repo = issue_json["repository"]["name"]
-        pr_id = issue_json["number"]
-        return self._get_request(pr_id, owner, repo)
+
+        ret = Request(self.api)
+        ret.read_issue(issue_json, owner, repo)
+        return ret
 
     def get_request_list_with_history(
             self, project='', package='', req_who='', req_state=('new', 'review', 'declined'),

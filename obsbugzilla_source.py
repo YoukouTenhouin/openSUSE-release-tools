@@ -4,6 +4,7 @@ import sys
 from datetime import datetime, timedelta, timezone
 import cmdln
 import json
+import re
 
 import osc.core
 
@@ -46,8 +47,25 @@ class SourceOBS(ReviewBot.ReviewBot):
             since = datetime.fromisoformat(cmdopts.since)
         else:
             since = datetime.now(timezone.utc) - timedelta(days=1)
+
+        re_either = None
+        re_title = None
+        re_body = None
+        if cmdopts.filter:
+            re_either = re.compile(cmdopts.filter)
+        if cmdopts.filter_title:
+            re_title = re.compile(cmdopts.filter_title)
+        if cmdopts.filter_description:
+            re_body = re.compile(cmdopts.filter_description)
         requests = self._search_requests(ns=cmdopts.namespace, since=since)
         for req in requests:
+            if re_either and not (re_either.search(req.title) or re_either.search(req.description)):
+                continue
+            if re_title and not re_title.search(req.title):
+                continue
+            if re_body and not re_body.search(req.description):
+                continue
+
             actions = []
             for action in req.actions:
                 a = {}
@@ -55,10 +73,14 @@ class SourceOBS(ReviewBot.ReviewBot):
                     a["sourcepackage"] = action.src_package
                 if hasattr(action, 'src_project'):
                     a["sourceproject"] = action.src_project
+                if hasattr(action, 'src_branch'):
+                    a["sourcebranch"] = action.src_branch
                 if hasattr(action, 'tgt_package'):
                     a["targetpackage"] = action.tgt_package
                 if hasattr(action, 'tgt_project'):
                     a["targetproject"] = action.tgt_project
+                if hasattr(action, 'tgt_branch'):
+                    a["targetbranch"] = action.tgt_branch
                 actions.append(a)
             print(json.dumps({
                 "request": req.reqid,
@@ -74,6 +96,9 @@ class CommandLineInterface(ReviewBot.CommandLineInterface):
 
     @cmdln.option('-n', '--namespace', default='openSUSE:', help='Namespace to fetch requests from')
     @cmdln.option('--since', help='only check pull requests after the given time.')
+    @cmdln.option('--filter-title', help='regex filter for title')
+    @cmdln.option('--filter-description', help='regex filter for description')
+    @cmdln.option('--filter', help='regex filter for either title or description')
     def do_fetch(self, subcmd, opts, *args):
         self.checker.do_fetch(self.options, opts)
 
