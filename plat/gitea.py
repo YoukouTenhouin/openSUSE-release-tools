@@ -200,6 +200,9 @@ class Request:
         self._repo = None
         self._pr_id = None
 
+        # XXX hack for obsbuzilla_source.py
+        self._raw_json = None
+
     @property
     def reqid(self):
         if not self._owner or not self._repo or not self._pr_id:
@@ -239,6 +242,8 @@ class Request:
         self.title = json["title"]
         self.description = json["body"]
         self.state = json["state"]
+
+        self._raw_json = json
 
     def _load(self):
         res = self.api.get(f'repos/{self._owner}/{self._repo}/pulls/{self._pr_id}').json()

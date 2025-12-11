@@ -82,12 +82,15 @@ class SourceOBS(ReviewBot.ReviewBot):
                 if hasattr(action, 'tgt_branch'):
                     a["targetbranch"] = action.tgt_branch
                 actions.append(a)
-            print(json.dumps({
+            output = {
                 "request": req.reqid,
                 "title": req.title,
                 "body": req.description,
                 "actions": actions
-            }))
+            }
+            if cmdopts.raw and hasattr(req, "_raw_json"):
+                output["json"] = req._raw_json
+            print(json.dumps(output))
 
 class CommandLineInterface(ReviewBot.CommandLineInterface):
     def __init__(self, *args, **kwargs):
@@ -99,6 +102,7 @@ class CommandLineInterface(ReviewBot.CommandLineInterface):
     @cmdln.option('--filter-title', help='regex filter for title')
     @cmdln.option('--filter-description', help='regex filter for description')
     @cmdln.option('--filter', help='regex filter for either title or description')
+    @cmdln.option('--raw', help='Output raw JSON from API requests', action="store_true")
     def do_fetch(self, subcmd, opts, *args):
         self.checker.do_fetch(self.options, opts)
 
